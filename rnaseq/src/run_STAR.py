@@ -8,6 +8,7 @@ import gzip
 import shutil
 from datetime import datetime
 import contextlib
+import sys
 
 @contextlib.contextmanager
 def cd(cd_path):
@@ -17,21 +18,25 @@ def cd(cd_path):
     os.chdir(saved_path)
 
 
+SAMTOOLS="/opt/htcf/spack/opt/spack/linux-ubuntu16.04-x86_64/gcc-5.4.0/samtools-1.9-jjq5nuaykk2hcqw2v7qimvyvdp7fpvvr/bin/samtools"
+
 parser = argparse.ArgumentParser(description='Run STAR')
 parser.add_argument('index', help='Path to STAR index')
 parser.add_argument('fastq', nargs='+', help='FASTQ input. Format: fastq1 [fastq2], or comma-separated lists for each if multiple FASTQs/mate.')
-parser.add_argument('prefix', help='Prefix for output file names')
+parser.add_argument('--prefix', help='Prefix for output file names')
 parser.add_argument('-o', '--output_dir', default='./', help='Output directory')
+parser.add_argument('--star-path', default='/opt/htcf/spack/opt/spack/linux-ubuntu16.04-x86_64/gcc-5.4.0/star-2.7.2b-fqvrpgiyzp37pb6nmqm3qweb7eanqdqi/bin/STAR', help='Path to STAR')
 parser.add_argument('--annotation_gtf', default=None, help='Annotation in GTF format')
-parser.add_argument('--outFilterMultimapNmax', default='20')
+parser.add_argument('--outFilterMultimapNmax', default='1') # NR: changed from 20 to 1
 parser.add_argument('--alignSJoverhangMin', default='8')
 parser.add_argument('--alignSJDBoverhangMin', default='1')
-parser.add_argument('--outFilterMismatchNmax', default='999')
-parser.add_argument('--outFilterMismatchNoverLmax', default='0.1')
+parser.add_argument('--outFilterMismatchNmax', default='3') # NR: changed fro 999 to 3.  Value is per alignment.  Not sure if this is both PE reads or each PE read individually
+parser.add_argument('--outFilterMismatchNoverLmax', default='0.1') # NR: not sure how STAR handles conflicting filter outputs.  Maybe it takes the more conservative filter?
 parser.add_argument('--alignIntronMin', default='20')
 parser.add_argument('--alignIntronMax', default='1000000')
 parser.add_argument('--alignMatesGapMax', default='1000000')
 parser.add_argument('--outFilterType', default='BySJout')
+parser.add_argument('--outFilterScoreMin', default='255') # NR: only output uniquely mapped reads
 parser.add_argument('--outFilterScoreMinOverLread', default='0.33')
 parser.add_argument('--outFilterMatchNminOverLread', default='0.33')
 parser.add_argument('--limitSjdbInsertNsj', default='1200000')
@@ -43,10 +48,7 @@ parser.add_argument('--outSAMtype', default=['BAM', 'Unsorted'], nargs='+')
 parser.add_argument('--outSAMunmapped', default='Within', help='Keep unmapped reads in output BAM')
 parser.add_argument('--outSAMattrRGline', default=['ID:rg1', 'SM:sm1'], nargs='+', help='Adds read group line to BAM header; required by GATK')
 parser.add_argument('--outSAMattributes', default=['NH', 'HI', 'AS', 'nM', 'NM', 'ch'], nargs='+')
-parser.add_argument('--chimSegmentMin', default='15', help='Minimum chimeric segment length; switches on detection of chimeric (fusion) alignments')
-parser.add_argument('--chimJunctionOverhangMin', default='15', help='Minimum overhang for a chimeric junction')
-parser.add_argument('--chimOutType', default=['WithinBAM', 'SoftClip'], nargs='+', help='')
-parser.add_argument('--chimMainSegmentMultNmax', default='1', help='')
+parser.add_argument('--chimSegmentMin', default='0', help='Minimum chimeric segment length; switches on detection of chimeric (fusion) alignments') # NR: turn off chimeric
 parser.add_argument('--genomeLoad', default='NoSharedMemory')
 parser.add_argument('--sjdbFileChrStartEnd', default=None, help='SJ.out.tab file (e.g., from 1st pass). With this option, only one pass will be run')
 parser.add_argument('--STARlong', action='store_true', help='Use STARlong instead of STAR')
@@ -56,7 +58,7 @@ args = parser.parse_args()
 if args.STARlong:
     starcmd = 'STARlong'
 else:
-    starcmd = 'STAR'
+    starcmd = args.star_path
 
 # set up command
 cmd = starcmd+' --runMode alignReads --runThreadN '+args.threads+' --genomeDir '+args.index
@@ -69,6 +71,7 @@ cmd +=' --outFilterMultimapNmax '+args.outFilterMultimapNmax\
     +' --outFilterMismatchNmax '+args.outFilterMismatchNmax+' --outFilterMismatchNoverLmax '+args.outFilterMismatchNoverLmax\
     +' --alignIntronMin '+args.alignIntronMin+' --alignIntronMax '+args.alignIntronMax+' --alignMatesGapMax '+args.alignMatesGapMax\
     +' --outFilterType '+args.outFilterType\
+    +' --outFilterScoreMin '+args.outFilterScoreMin\
     +' --outFilterScoreMinOverLread '+args.outFilterScoreMinOverLread+' --outFilterMatchNminOverLread '+args.outFilterMatchNminOverLread\
     +' --limitSjdbInsertNsj '+args.limitSjdbInsertNsj\
     +' --readFilesIn '+' '.join(args.fastq)
@@ -78,9 +81,7 @@ cmd += ' --outFileNamePrefix '+os.path.join(args.output_dir, args.prefix)+'.'\
     +' --outSAMstrandField '+args.outSAMstrandField+' --outFilterIntronMotifs '+args.outFilterIntronMotifs\
     +' --alignSoftClipAtReferenceEnds '+args.alignSoftClipAtReferenceEnds+' --quantMode '+' '.join(args.quantMode)\
     +' --outSAMtype '+' '.join(args.outSAMtype)+' --outSAMunmapped '+args.outSAMunmapped+' --genomeLoad '+args.genomeLoad
-if int(args.chimSegmentMin)>0:
-    cmd += ' --chimSegmentMin '+args.chimSegmentMin+' --chimJunctionOverhangMin '+args.chimJunctionOverhangMin\
-        +' --chimOutType '+' '.join(args.chimOutType)+' --chimMainSegmentMultNmax '+args.chimMainSegmentMultNmax
+
 cmd += ' --outSAMattributes '+' '.join(args.outSAMattributes)+' --outSAMattrRGline '+' '.join(args.outSAMattrRGline)
 if args.sjdbFileChrStartEnd is not None:
     cmd += ' --sjdbFileChrStartEnd '+args.sjdbFileChrStartEnd
@@ -89,7 +90,13 @@ if not os.path.exists(args.output_dir):
     os.makedirs(args.output_dir)
 
 # run STAR
-subprocess.check_call(cmd, shell=True, executable='/bin/bash')
+print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] STAR command: ' + cmd, flush=True)
+
+try:
+    subprocess.check_call(cmd, shell=True, executable='/bin/bash')
+except subprocess.CalledProcessError as e:
+    print("ERROR: command failed for following reason: %s" % (e), file=sys.stderr)
+    exit(1)
 
 # postprocessing
 with cd(args.output_dir):
@@ -104,21 +111,23 @@ with cd(args.output_dir):
 
     # sort BAM (use samtools to get around the memory gluttony of STAR)
     print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] Sorting BAM', flush=True)
-    cmd = 'samtools sort --threads '+args.threads+' -o '+args.prefix+'.Aligned.sortedByCoord.out.bam '+args.prefix+'.Aligned.out.bam'
-    subprocess.check_call(cmd, shell=True, executable='/bin/bash')
+    cmd = SAMTOOLS + ' sort --threads '+args.threads+' -o '+args.prefix+'.Aligned.sortedByCoord.out.bam '+args.prefix+'.Aligned.out.bam'
+    try:
+        subprocess.check_call(cmd, shell=True, executable='/bin/bash')
+    except subprocess.CalledProcessError as e:
+        print("ERROR: command failed for following reason: %s" % (e), file=sys.stderr)
+        exit(1)
     os.remove(args.prefix+'.Aligned.out.bam')
     print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] Finished sorting BAM', flush=True)
 
     # index BAM
     print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] Indexing BAM', flush=True)
-    cmd = 'samtools index '+args.prefix+'.Aligned.sortedByCoord.out.bam'
-    subprocess.check_call(cmd, shell=True, executable='/bin/bash')
+    cmd = SAMTOOLS + ' index '+args.prefix+'.Aligned.sortedByCoord.out.bam'
+    try:
+        subprocess.check_call(cmd, shell=True, executable='/bin/bash')
+    except subprocess.CalledProcessError as e:
+        print("ERROR: command failed for following reason: %s" % (e), file=sys.stderr)
+        exit(1)
+
     print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] Finished indexing BAM', flush=True)
 
-    # sort and index chimeric BAM
-    if int(args.chimSegmentMin)>0:
-        cmd = 'samtools sort --threads '+args.threads+' -o '+args.prefix+'.Chimeric.out.sorted.bam '+args.prefix+'.Chimeric.out.sam'
-        subprocess.check_call(cmd, shell=True, executable='/bin/bash')
-        cmd = 'samtools index '+args.prefix+'.Chimeric.out.sorted.bam'
-        subprocess.check_call(cmd, shell=True, executable='/bin/bash')
-        os.remove(args.prefix+'.Chimeric.out.sam')
