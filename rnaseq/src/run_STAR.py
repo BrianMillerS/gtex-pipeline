@@ -27,16 +27,19 @@ parser.add_argument('--prefix', help='Prefix for output file names')
 parser.add_argument('-o', '--output_dir', default='./', help='Output directory')
 parser.add_argument('--star-path', default='/opt/htcf/spack/opt/spack/linux-ubuntu16.04-x86_64/gcc-5.4.0/star-2.7.2b-fqvrpgiyzp37pb6nmqm3qweb7eanqdqi/bin/STAR', help='Path to STAR')
 parser.add_argument('--annotation_gtf', default=None, help='Annotation in GTF format')
-parser.add_argument('--outFilterMultimapNmax', default='1') # NR: changed from 20 to 1
+parser.add_argument('--outFilterMultimapNmax', default='20') # NR: changed from 20 to 1
+#parser.add_argument('--outFilterMultimapNmax', default='1') # NR: changed from 20 to 1
 parser.add_argument('--alignSJoverhangMin', default='8')
 parser.add_argument('--alignSJDBoverhangMin', default='1')
-parser.add_argument('--outFilterMismatchNmax', default='3') # NR: changed fro 999 to 3.  Value is per alignment.  Not sure if this is both PE reads or each PE read individually
+parser.add_argument('--outFilterMismatchNmax', default='999') # NR: changed fro 999 to 3.  Value is per alignment.  Not sure if this is both PE reads or each PE read individually
+#parser.add_argument('--outFilterMismatchNmax', default='3') # NR: changed fro 999 to 3.  Value is per alignment.  Not sure if this is both PE reads or each PE read individually
 parser.add_argument('--outFilterMismatchNoverLmax', default='0.1') # NR: not sure how STAR handles conflicting filter outputs.  Maybe it takes the more conservative filter?
 parser.add_argument('--alignIntronMin', default='20')
 parser.add_argument('--alignIntronMax', default='1000000')
 parser.add_argument('--alignMatesGapMax', default='1000000')
 parser.add_argument('--outFilterType', default='BySJout')
-parser.add_argument('--outFilterScoreMin', default='255') # NR: only output uniquely mapped reads
+parser.add_argument('--outFilterScoreMin', default='0') # NR: only output uniquely mapped reads
+#parser.add_argument('--outFilterScoreMin', default='255') # NR: only output uniquely mapped reads
 parser.add_argument('--outFilterScoreMinOverLread', default='0.33')
 parser.add_argument('--outFilterMatchNminOverLread', default='0.33')
 parser.add_argument('--limitSjdbInsertNsj', default='1200000')
@@ -90,7 +93,7 @@ if not os.path.exists(args.output_dir):
     os.makedirs(args.output_dir)
 
 # run STAR
-print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] STAR command: ' + cmd, flush=True)
+print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] STAR command: ' + cmd, flush=True, file=sys.stderr)
 
 try:
     subprocess.check_call(cmd, shell=True, executable='/bin/bash')
@@ -110,7 +113,7 @@ with cd(args.output_dir):
         shutil.rmtree(args.prefix+'._STARtmp')
 
     # sort BAM (use samtools to get around the memory gluttony of STAR)
-    print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] Sorting BAM', flush=True)
+    print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] Sorting BAM', flush=True, file=sys.stderr)
     cmd = SAMTOOLS + ' sort --threads '+args.threads+' -o '+args.prefix+'.Aligned.sortedByCoord.out.bam '+args.prefix+'.Aligned.out.bam'
     try:
         subprocess.check_call(cmd, shell=True, executable='/bin/bash')
@@ -118,10 +121,10 @@ with cd(args.output_dir):
         print("ERROR: command failed for following reason: %s" % (e), file=sys.stderr)
         exit(1)
     os.remove(args.prefix+'.Aligned.out.bam')
-    print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] Finished sorting BAM', flush=True)
+    print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] Finished sorting BAM', flush=True, file=sys.stderr)
 
     # index BAM
-    print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] Indexing BAM', flush=True)
+    print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] Indexing BAM', flush=True, file=sys.stderr)
     cmd = SAMTOOLS + ' index '+args.prefix+'.Aligned.sortedByCoord.out.bam'
     try:
         subprocess.check_call(cmd, shell=True, executable='/bin/bash')
@@ -129,5 +132,5 @@ with cd(args.output_dir):
         print("ERROR: command failed for following reason: %s" % (e), file=sys.stderr)
         exit(1)
 
-    print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] Finished indexing BAM', flush=True)
+    print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] Finished indexing BAM', flush=True, file=sys.stderr)
 
