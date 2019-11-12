@@ -27,7 +27,7 @@ parser.add_argument('--java', default='/opt/apps/java/1.8.0_31/bin/java', help='
 parser.add_argument('--jar', default='/opt/apps/picard-tools/2.9.4/picard.jar', help='Path to Picard jar')
 args = parser.parse_args()
 
-print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] Starting MarkDuplicates', flush=True)
+print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] Starting MarkDuplicates', flush=True, file=sys.stderr)
 
 if not os.path.exists(args.output_dir):
     os.makedirs(args.output_dir)
@@ -39,11 +39,11 @@ with cd(args.output_dir):
         +' PROGRAM_RECORD_ID=null'\
         +' M='+args.prefix+'.marked_dup_metrics.txt'+' ASSUME_SORT_ORDER=coordinate OPTICAL_DUPLICATE_PIXEL_DISTANCE='+str(args.optical_duplicate_pixel_distance)
 
-    print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] MarkDuplicates command: %s' %(cmd), flush=True)
+    print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] MarkDuplicates command: %s' %(cmd), flush=True, file=sys.stderr)
     try:
         subprocess.check_call(cmd, shell=True)
     except subprocess.CalledProcessError as e:
         print("ERROR: command failed for following reason: %s" % (e), file=sys.stderr)
         exit(1)
 
-print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] Finished MarkDuplicates', flush=True)
+print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] Finished MarkDuplicates', flush=True, file=sys.stderr)

@@ -24,42 +24,30 @@ parser.add_argument('-o', '--output_dir', default=os.getcwd(), help='Directory t
 parser.add_argument('-m', '--memory', default='8', type=str, help='Memory, in GB')
 parser.add_argument('--java', default='/opt/apps/java/1.8.0_31/bin/java', help='Path to java')
 parser.add_argument('--jar', default='/opt/apps/picard-tools/2.9.4/picard.jar', help='Path to Picard jar')
-parser.add_argument('--gzip', type=str.lower, default='1', help='gzip compression level for FASTQs; see "man gzip"')
 parser.add_argument('--include_non_pf_reads', type=str.lower, choices=['true', 'false'], default='true', help='Sets INCLUDE_NON_PF_READS option (PF: passed filtering). SamToFastq default: false')
 parser.add_argument('--include_non_primary_alignments', type=str.lower, choices=['true', 'false'], default='false', help='Sets INCLUDE_NON_PRIMARY_ALIGNMENTS option. SamToFastq default: false')
 args = parser.parse_args()
 
-print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] Starting SamToFastq', flush=True)
+print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] Starting SamToFastq', flush=True, file=sys.stderr)
 
 if not os.path.exists(args.output_dir):
     os.makedirs(args.output_dir)
 
-# Make named pipes for gzip
 with cd(args.output_dir):
     fastq1 = args.prefix+'_1.fastq.gz'
     fastq2 = args.prefix+'_2.fastq.gz'
     fastq0 = args.prefix+'_unpaired.fastq.gz'
 
-    subprocess.check_call('mkfifo read1_pipe read2_pipe read0_pipe', shell=True)
 
-    # Set gzip streams
-    subprocess.check_call('gzip -'+args.gzip+' -c < read1_pipe > '+fastq1+' &', shell=True)
-    subprocess.check_call('gzip -'+args.gzip+' -c < read2_pipe > '+fastq2+' &', shell=True)
-    subprocess.check_call('gzip -'+args.gzip+' -c < read0_pipe > '+fastq0+' &', shell=True)
-
-    # SamToFastq (write to pipes)
     try:
         subprocess.check_call(args.java + ' -jar -Xmx'+args.memory+'g '+args.jar+' SamToFastq INPUT='+args.bam_file\
         +' INCLUDE_NON_PF_READS='+args.include_non_pf_reads\
         +' INCLUDE_NON_PRIMARY_ALIGNMENTS='+args.include_non_primary_alignments\
-        +' VALIDATION_STRINGENCY=SILENT FASTQ=read1_pipe SECOND_END_FASTQ=read2_pipe UNPAIRED_FASTQ=read0_pipe', shell=True)
+        +' VALIDATION_STRINGENCY=SILENT FASTQ=' + fastq1 + ' SECOND_END_FASTQ=' + fastq2 + ' UNPAIRED_FASTQ=' + fastq0, shell=True)
     except subprocess.CalledProcessError as e:
         print("ERROR: command failed for following reason: %s" % (e), file=sys.stderr)
         exit(1)
 
-
-    # Delete named pipes
-    subprocess.check_call('rm read1_pipe read2_pipe read0_pipe', shell=True)
 
     # Delete unpaired reads FASTQ if empty
     with open(fastq0, 'rb') as f0:
@@ -67,4 +55,4 @@ with cd(args.output_dir):
         if struct.unpack('<I', f0.read(4))[0]==0:  # empty file
             os.remove(fastq0)
 
-print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] Finished SamToFastq', flush=True)
+print('['+datetime.now().strftime("%b %d %H:%M:%S")+'] Finished SamToFastq', flush=True, file=sys.stderr)
